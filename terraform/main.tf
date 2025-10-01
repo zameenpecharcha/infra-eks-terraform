@@ -115,4 +115,126 @@ resource "kubernetes_namespace" "auth" {
 }
 
 resource "kubernetes_namespace" "post" {
-  metadata { n
+  metadata { name = "post" }
+  lifecycle { ignore_changes = [metadata[0].name] }
+}
+
+resource "kubernetes_namespace" "property" {
+  metadata { name = "property" }
+  lifecycle { ignore_changes = [metadata[0].name] }
+}
+
+resource "kubernetes_namespace" "user" {
+  metadata { name = "user" }
+  lifecycle { ignore_changes = [metadata[0].name] }
+}
+
+resource "kubernetes_namespace" "chat" {
+  metadata { name = "chat" }
+  lifecycle { ignore_changes = [metadata[0].name] }
+}
+
+#############################
+# Kubernetes Services (ClusterIP)
+#############################
+resource "kubernetes_service" "api_gateway" {
+  metadata {
+    name      = "api-gateway"
+    namespace = kubernetes_namespace.api.metadata[0].name
+  }
+  spec {
+    selector = { app = "api-gateway" }
+    port {
+      protocol    = "TCP"
+      port        = 80
+      target_port = 5000
+    }
+    type = "ClusterIP"
+  }
+  lifecycle { ignore_changes = [metadata, spec] }
+}
+
+resource "kubernetes_service" "auth_service" {
+  metadata {
+    name      = "auth-service"
+    namespace = kubernetes_namespace.auth.metadata[0].name
+  }
+  spec {
+    selector = { app = "auth-service" }
+    port {
+      protocol    = "TCP"
+      port        = 80
+      target_port = 5001
+    }
+    type = "ClusterIP"
+  }
+  lifecycle { ignore_changes = [metadata, spec] }
+}
+
+resource "kubernetes_service" "post_service" {
+  metadata {
+    name      = "post-service"
+    namespace = kubernetes_namespace.post.metadata[0].name
+  }
+  spec {
+    selector = { app = "post-service" }
+    port {
+      protocol    = "TCP"
+      port        = 80
+      target_port = 5002
+    }
+    type = "ClusterIP"
+  }
+  lifecycle { ignore_changes = [metadata, spec] }
+}
+
+resource "kubernetes_service" "property_service" {
+  metadata {
+    name      = "property-service"
+    namespace = kubernetes_namespace.property.metadata[0].name
+  }
+  spec {
+    selector = { app = "property-service" }
+    port {
+      protocol    = "TCP"
+      port        = 80
+      target_port = 5003
+    }
+    type = "ClusterIP"
+  }
+  lifecycle { ignore_changes = [metadata, spec] }
+}
+
+resource "kubernetes_service" "chat_service" {
+  metadata {
+    name      = "chat-service"
+    namespace = kubernetes_namespace.chat.metadata[0].name
+  }
+  spec {
+    selector = { app = "chat-service" }
+    port {
+      protocol    = "TCP"
+      port        = 80
+      target_port = 5004
+    }
+    type = "ClusterIP"
+  }
+  lifecycle { ignore_changes = [metadata, spec] }
+}
+
+resource "kubernetes_service" "user_service" {
+  metadata {
+    name      = "user-service"
+    namespace = kubernetes_namespace.user.metadata[0].name
+  }
+  spec {
+    selector = { app = "user-service" }
+    port {
+      protocol    = "TCP"
+      port        = 80
+      target_port = 5005
+    }
+    type = "ClusterIP"
+  }
+  lifecycle { ignore_changes = [metadata, spec] }
+}
