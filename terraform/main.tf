@@ -1,29 +1,50 @@
-# Inline configuration for VPC
+#############################
+# Providers
+#############################
+provider "aws" {
+  region = "ap-south-1"
+}
+
+# Authenticate Kubernetes provider using EKS details
+data "aws_eks_cluster_auth" "main" {
+  name = aws_eks_cluster.main.name
+}
+
+provider "kubernetes" {
+  host                   = aws_eks_cluster.main.endpoint
+  cluster_ca_certificate = base64decode(aws_eks_cluster.main.certificate_authority[0].data)
+  token                  = data.aws_eks_cluster_auth.main.token
+}
+
+#############################
+# Networking (VPC + Subnets)
+#############################
 resource "aws_vpc" "main" {
-  cidr_block = var.vpc_cidr_block
-  enable_dns_support = true
+  cidr_block           = var.vpc_cidr_block
+  enable_dns_support   = true
   enable_dns_hostnames = true
   tags = {
     Name = "main-vpc"
   }
 }
 
+data "aws_availability_zones" "available" {}
+
 resource "aws_subnet" "main" {
-  count = var.subnet_count
-  vpc_id = aws_vpc.main.id
-  cidr_block = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
+  count             = var.subnet_count
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = cidrsubnet(aws_vpc.main.cidr_block, 8, count.index)
   availability_zone = data.aws_availability_zones.available.names[count.index]
   tags = {
     Name = "main-subnet-${count.index}"
   }
 }
 
-# Declare the missing data resource for availability zones
-data "aws_availability_zones" "available" {}
-
-# Inline configuration for IAM
+#############################
+# IAM Role for EKS
+#############################
 resource "aws_iam_role" "eks_role" {
-  name = "eks-role"
+  name = "eks-role-${var.cluster_name}" # avoid duplicate name errors
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
@@ -37,18 +58,20 @@ resource "aws_iam_role" "eks_role" {
     ]
   })
   tags = {
-    Name = "eks-role"
+    Name = "eks-role-${var.cluster_name}"
   }
 }
 
 resource "aws_iam_role_policy_attachment" "eks_policy" {
-  role = aws_iam_role.eks_role.name
+  role       = aws_iam_role.eks_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
 }
 
-# Inline configuration for EKS
+#############################
+# EKS Cluster
+#############################
 resource "aws_eks_cluster" "main" {
-  name = var.cluster_name
+  name     = var.cluster_name
   role_arn = aws_iam_role.eks_role.arn
   vpc_config {
     subnet_ids = aws_subnet.main[*].id
@@ -58,54 +81,43 @@ resource "aws_eks_cluster" "main" {
   }
 }
 
-# Define Kubernetes namespaces for all services
+#############################
+# Kubernetes Namespaces
+#############################
 resource "kubernetes_namespace" "api" {
-  metadata {
-    name = "api"
-  }
+  metadata { name = "api" }
 }
 
 resource "kubernetes_namespace" "auth" {
-  metadata {
-    name = "auth"
-  }
+  metadata { name = "auth" }
 }
 
 resource "kubernetes_namespace" "post" {
-  metadata {
-    name = "post"
-  }
+  metadata { name = "post" }
 }
 
-# Example: Create namespaces for microservices
 resource "kubernetes_namespace" "property" {
-  metadata {
-    name = "property"
-  }
+  metadata { name = "property" }
 }
 
 resource "kubernetes_namespace" "user" {
-  metadata {
-    name = "user"
-  }
+  metadata { name = "user" }
 }
 
 resource "kubernetes_namespace" "chat" {
-  metadata {
-    name = "chat"
-  }
+  metadata { name = "chat" }
 }
 
-# Define Kubernetes services for all microservices
+#############################
+# Kubernetes Services (ClusterIP)
+#############################
 resource "kubernetes_service" "api_gateway" {
   metadata {
     name      = "api-gateway"
     namespace = kubernetes_namespace.api.metadata[0].name
   }
   spec {
-    selector = {
-      app = "api-gateway"
-    }
+    selector = { app = "api-gateway" }
     port {
       protocol    = "TCP"
       port        = 80
@@ -121,9 +133,7 @@ resource "kubernetes_service" "auth_service" {
     namespace = kubernetes_namespace.auth.metadata[0].name
   }
   spec {
-    selector = {
-      app = "auth-service"
-    }
+    selector = { app = "auth-service" }
     port {
       protocol    = "TCP"
       port        = 80
@@ -139,9 +149,7 @@ resource "kubernetes_service" "post_service" {
     namespace = kubernetes_namespace.post.metadata[0].name
   }
   spec {
-    selector = {
-      app = "post-service"
-    }
+    selector = { app = "post-service" }
     port {
       protocol    = "TCP"
       port        = 80
@@ -157,9 +165,7 @@ resource "kubernetes_service" "property_service" {
     namespace = kubernetes_namespace.property.metadata[0].name
   }
   spec {
-    selector = {
-      app = "property-service"
-    }
+    selector = { app = "property-service" }
     port {
       protocol    = "TCP"
       port        = 80
@@ -175,9 +181,7 @@ resource "kubernetes_service" "chat_service" {
     namespace = kubernetes_namespace.chat.metadata[0].name
   }
   spec {
-    selector = {
-      app = "chat-service"
-    }
+    selector = { app = "chat-service" }
     port {
       protocol    = "TCP"
       port        = 80
@@ -193,9 +197,7 @@ resource "kubernetes_service" "user_service" {
     namespace = kubernetes_namespace.user.metadata[0].name
   }
   spec {
-    selector = {
-      app = "user-service"
-    }
+    selector = { app = "user-service" }
     port {
       protocol    = "TCP"
       port        = 80
@@ -203,13 +205,4 @@ resource "kubernetes_service" "user_service" {
     }
     type = "ClusterIP"
   }
-}
-
-# Kubernetes provider configuration
-provider "kubernetes" {
-  config_path = "~/.kube/config" # Update this path if your kubeconfig is located elsewhere
-}
-
-provider "aws" {
-  region = "us-east-1"
 }
